@@ -5,12 +5,15 @@
             [clojure.string :as s]))
 
 
-
 (def monsters_res
   (client/get "https://mhrise.kiranico.com/data/monsters"))
 
 (def base_res
 (client/get "https://mhrise.kiranico.com/"))
+
+(def ls_res
+(client/get "https://mhrise.kiranico.com/data/weapons?scope=wp&value=3"))
+
 
 (defn monsters
   [res]
@@ -35,6 +38,7 @@
                     {:monster/name name :monster/img img :monster/href href})
                   ))))
 
+
 (defn nav
   [res]
   ; response from base page
@@ -57,14 +61,31 @@
                     {:nav/name link_name :nav/href nav_href}
                     )))))
 
+(defn get_nav_link
+  [res item]
+  (let [nl (nav res)]
+    (->(filter #(= (:nav/name %) item) nl)
+       first
+       (get :nav/href))))
+
+
+(defn parse_weapons
+  [res]
+  )
+
 
 (defn -main
   []
-  (let [response base_res]
+  (let [response ls_res]
     (when (= (:status response) 200)
       #_(monsters response)
-      (let [nl (nav response)]
-        (->(filter #(= (:nav/name %) "Long Sword") nl)
-           first
-           :href)
-        ))))
+      #_(get_nav_link response "Long Sword")
+      #_(weapons response)
+      (->> (:body response)
+       hc/parse
+       hc/as-hickory
+       (hs/select (hs/descendant (hs/tag :tbody)
+                                 (hs/tag :tr)))
+       (map (fn [row]
+              (let [skills
+                    (-> (hs/select (hs/tag)))])))))))
