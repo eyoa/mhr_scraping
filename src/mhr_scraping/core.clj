@@ -1,9 +1,16 @@
 (ns mhr-scraping.core
   (:require [clj-http.client :as client]
             [hickory.select :as hs]
-            [hickory.core :as hc]))
+            [hickory.core :as hc]
+            [clojure.string :as s]))
 
 
+
+(def monsters_res
+  (client/get "https://mhrise.kiranico.com/data/monsters"))
+
+(def base_res
+(client/get "https://mhrise.kiranico.com/"))
 
 (defn monsters
   [res]
@@ -18,30 +25,46 @@
                   (let [href (get attrs :href)
                         name 
                         (-> (hs/select (hs/tag :h3) element)
-                            (first)
-                            (get :content))
+                            first
+                            :content)
                         
                         img
                         (-> (hs/select (hs/tag :img) element)
-                            (first)
+                            first
                             (get-in [:attrs :src]))]
-                    {:name name :img img :href href})
+                    {:monster/name name :monster/img img :monster/href href})
                   ))))
-
 
 (defn nav
   [res]
-  )
+  ; response from base page
+  (->> (:body res)
+           hc/parse
+           hc/as-hickory
+           (hs/select (hs/descendant (hs/attr :aria-label #(= % "Sidebar"))
+                                     (hs/tag :a)))
+           (map (fn [element]
+                  (let [link_name
+                        (s/trim (str ""
+                                     (-> (hs/select (hs/tag :a) element)
+                                         first
+                                         :content
+                                         first)))
+                        nav_href
+                        (-> (hs/select (hs/tag :a) element)
+                            first
+                            (get-in [:attrs :href]))]
+                    {:nav/name link_name :nav/href nav_href}
+                    )))))
+
 
 (defn -main
   []
-  (let [response (client/get "https://mhrise.kiranico.com/")]
+  (let [response base_res]
     (when (= (:status response) 200)
       #_(monsters response)
-      (->> (:body response)
-           hc/parse
-           hc/as-hickory
-           (hs/select (hs/descendant (hs/tag :nav)
-                                     #_(hs/attr :aria-label #(.startsWith % "Side"))
-                                     #_(hs/tag :a))))))
-)
+      (let [nl (nav response)]
+        (->(filter #(= (:nav/name %) "Long Sword") nl)
+           first
+           :href)
+        ))))
