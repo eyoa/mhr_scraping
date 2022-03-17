@@ -1,91 +1,76 @@
 (ns mhr-scraping.core
-  (:require [clj-http.client :as client]
-            [hickory.select :as hs]
-            [hickory.core :as hc]
-            [clojure.string :as s]))
+  (:require
+   [clojure.string :as string]
+   [clj-http.client :as client]
+   [hickory.select :as hickory.select]
+   [hickory.core :as hickory]
+   [mhr-scraping.parsers.monters :as parsers.monsters]))
 
+(defmulti parse
+  (fn [nav]
+    (or (:nav/parent nav)
+        (:nav/name nav))))
 
-(def monsters_res
-  (client/get "https://mhrise.kiranico.com/data/monsters"))
+(defmethod parse :default
+  [nav]
+  nil)
 
-(def base_res
-(client/get "https://mhrise.kiranico.com/"))
+(defmethod parse "Monsters"
+  [nav]
+  (parsers.monsters/monsters (:body (client/get (:nav/href nav)))))
 
-(def ls_res
-(client/get "https://mhrise.kiranico.com/data/weapons?scope=wp&value=3"))
+(def domain
+  "https://mhrise.kiranico.com/")
 
-
-(defn monsters
-  [res]
-  ; res from /data/monsters
-  (->> (:body res) 
-           hc/parse 
-           hc/as-hickory
-           (hs/select (hs/descendant (hs/tag :aside)
-                                     (hs/tag :li)
-                                     (hs/tag :a)))
-           (map (fn [{:keys [attrs] :as element}]
-                  (let [href (get attrs :href)
-                        name 
-                        (-> (hs/select (hs/tag :h3) element)
-                            first
-                            :content)
-                        
-                        img
-                        (-> (hs/select (hs/tag :img) element)
-                            first
-                            (get-in [:attrs :src]))]
-                    {:monster/name name :monster/img img :monster/href href})
-                  ))))
-
+(defn parse-subnav
+  [[button subnav]]
+  (map (fn [el]
+         {:nav/parent (->> (:content button)
+                           (filter string?)
+                           string/join
+                           string/trim)
+          :nav/name (->> (:content el)
+                         (filter string?)
+                         string/join
+                         string/trim)
+          :nav/href (get-in el [:attrs :href])})
+       (hickory.select/select (hickory.select/child (hickory.select/tag :a))
+                              subnav)))
 
 (defn nav
-  [res]
-  ; response from base page
-  (->> (:body res)
-           hc/parse
-           hc/as-hickory
-           (hs/select (hs/descendant (hs/attr :aria-label #(= % "Sidebar"))
-                                     (hs/tag :a)))
-           (map (fn [element]
-                  (let [link_name
-                        (s/trim (str ""
-                                     (-> (hs/select (hs/tag :a) element)
-                                         first
-                                         :content
-                                         first)))
-                        nav_href
-                        (-> (hs/select (hs/tag :a) element)
-                            first
-                            (get-in [:attrs :href]))]
-                    {:nav/name link_name :nav/href nav_href}
-                    )))))
-
-(defn get_nav_link
-  [res item]
-  (let [nl (nav res)]
-    (->(filter #(= (:nav/name %) item) nl)
+  []
+  (->> (client/get domain)
+       :body
+       hickory/parse
+       hickory/as-hickory
+       (hickory.select/select
+        (hickory.select/child
+         (hickory.select/and (hickory.select/tag :nav)
+                             (hickory.select/attr :aria-label
+                                                  (fn [s]
+                                                    (= s "Sidebar"))))))
        first
-       (get :nav/href))))
-
-
-(defn parse_weapons
-  [res]
-  )
-
+       :content
+       first
+       :content
+       (filter (fn [el]
+                 (= (:type el) :element)))
+       (partition-by (fn [el]
+                       (= (:tag el) :a)))
+       (mapcat (fn [elements]
+                 (if (= (:tag (first elements)) :a)
+                   (map (fn [el]
+                          {:nav/name (->> (:content el)
+                                          (filter string?)
+                                          string/join
+                                          string/trim)
+                           :nav/href (get-in el [:attrs :href])})
+                        elements)
+                   (->> (first elements)
+                        :content
+                        (filter (fn [el] (= (:type el) :element)))
+                        parse-subnav))))))
 
 (defn -main
   []
-  (let [response ls_res]
-    (when (= (:status response) 200)
-      #_(monsters response)
-      #_(get_nav_link response "Long Sword")
-      #_(weapons response)
-      (->> (:body response)
-       hc/parse
-       hc/as-hickory
-       (hs/select (hs/descendant (hs/tag :tbody)
-                                 (hs/tag :tr)))
-       (map (fn [row]
-              (let [skills
-                    (-> (hs/select (hs/tag)))])))))))
+  (mapcat parse (nav)))
