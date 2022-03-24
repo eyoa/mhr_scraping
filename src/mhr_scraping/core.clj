@@ -17,8 +17,7 @@
 
 (defmethod parse "Monsters"
   [nav]
-  (parsers.monsters/monsters (:body (client/get (:nav/href nav)))) 
-)
+  (parsers.monsters/monsters (:body (client/get (:nav/href nav)))))
 
 (def domain
   "https://mhrise.kiranico.com/")
@@ -74,6 +73,4 @@
 
 (defn -main
   []
-  (mapcat parse (nav))
-)
-
+  (mapcat parse (nav)))

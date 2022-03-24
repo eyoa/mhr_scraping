@@ -5,62 +5,57 @@
    [hickory.core :as hickory]
    [clj-http.client :as client]))
 
+(defn text-content
+  [element]
+  (when (and (map? element)
+             (:content element))
+    (->> (map (fn [e]
+                (if (string? e)
+                  (string/trim e)
+                  (text-content e)))
+              (:content element))
+         string/join
+         string/trim)))
 
 (defn drops
   [table]
-  #_table
-  (->> table
-       (hickory.select/select
-        (hickory.select/descendant (hickory.select/tag :th)))
-       (map (fn [entry]
-              (->>
-               (:content entry)
-               (filter string?)
-               (string/join)
-               (string/trim)))))
-  (->> table
-       (hickory.select/select
-        (hickory.select/descendant (hickory.select/tag :tbody)
-                                   (hickory.select/tag :tr)))
-       (map (fn [trow]
-              (->> trow 
-                   (hickory.select/select
-                    (hickory.select/descendant (hickory.select/tag :td)))
-                   (map (fn [entry]
-
-                          (->> entry
-                               :content
-                               (filter (fn [el]
-                                         (= (:tag el) :a)))
-                               first
-                               :content
-                               (filter string?)
-                               (string/join)
-                               (string/trim))
-                          #_(->> entry
-                               :content
-                               (filter string?)
-                               (string/join)
-                               (string/trim)))))))))
-
-
-
-
+  (let [header (->> table
+                    (hickory.select/select
+                     (hickory.select/descendant (hickory.select/tag :th)))
+                    (map (fn [entry]
+                           (->>
+                            (:content entry)
+                            (filter string?)
+                            (string/join)
+                            (string/trim)))))
+        body (->> table
+                  (hickory.select/select
+                   (hickory.select/descendant (hickory.select/tag :tbody)
+                                              (hickory.select/tag :tr)))
+                  (map (fn [trow]
+                         (->> trow
+                              (hickory.select/select
+                               (hickory.select/descendant
+                                (hickory.select/tag :td)))
+                              (map text-content)))))]
+    (map (fn [row]
+           (apply hash-map (interleave header row)))
+         body)))
 
 (defn monster
   [url]
   (->> (:body (client/get "https://mhrise.kiranico.com/data/monsters/366824395"))
-      hickory/parse
-      hickory/as-hickory
-      (hickory.select/select
-       (hickory.select/descendant 
-        (hickory.select/and (hickory.select/tag :div)
-                            (hickory.select/attr :x-show
-                                                 (fn [x]
-                                                   (= x "tab === 'items'"))))
-        (hickory.select/descendant (hickory.select/tag :table))))
-      first
-      drops))
+       hickory/parse
+       hickory/as-hickory
+       (hickory.select/select
+        (hickory.select/descendant
+         (hickory.select/and (hickory.select/tag :div)
+                             (hickory.select/attr :x-show
+                                                  (fn [x]
+                                                    (= x "tab === 'items'"))))
+         (hickory.select/descendant (hickory.select/tag :table))))
+       first
+       drops))
 
 (defn monsters
   [body]
@@ -84,13 +79,10 @@
                         (get-in [:attrs :src]))
                     details
                     (monster href)]
-
                 {:monster/name name
                  :monster/img img
                  :monster/href href
                  :monster/details details})))))
-
-
 
 (defn main
   []
