@@ -4,7 +4,9 @@
    [clj-http.client :as client]
    [hickory.select :as hickory.select]
    [hickory.core :as hickory]
-   [mhr-scraping.parsers.monters :as parsers.monsters]))
+   [mhr-scraping.parsers.monsters :as parsers.monsters]
+   [mhr-scraping.parsers.weapons :as parsers.weapons]))
+
 
 (defmulti parse
   (fn [nav]
@@ -15,9 +17,13 @@
   [nav]
   nil)
 
-(defmethod parse "Monsters"
+#_(defmethod parse "Monsters"
   [nav]
   (parsers.monsters/monsters (:body (client/get (:nav/href nav)))))
+
+(defmethod parse "Weapons"
+  [nav]
+  (parsers.weapons/weapons (:body (client/get (:nav/href nav)))))
 
 (def domain
   "https://mhrise.kiranico.com/")

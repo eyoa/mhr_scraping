@@ -7,7 +7,7 @@
 
 (defn text-content
   [element]
-  (when (and (map? element)
+ (when (and (map? element)
              (:content element))
     (->> (map (fn [e]
                 (if (string? e)
@@ -57,7 +57,7 @@
          (hickory.select/descendant (hickory.select/tag :table))))
        first
        drops))
-
+ 
 (defn monsters
   [body]
   (->> body
@@ -84,3 +84,4 @@
                  :monster/img img
                  :monster/href href
                  :monster/details details})))))
+
