@@ -5,7 +5,6 @@
    [hickory.core :as hickory]
    [clj-http.client :as client]))
 
-
 (defn text-content
   [element]
   (-> element 
@@ -14,6 +13,22 @@
       :content
       string/join
       string/trim))
+
+(defn get-element
+  [element]
+  (if (empty? element)
+    nil
+    (map (fn [el]
+           (if (= (:type el) :element)
+             (-> el
+                 :content
+                 first
+                 (get-in [:attrs :src])
+                 (string/split #"/")
+                 last
+                 (string/split #"\.")
+                 first)
+             (string/trim el))) element )))
 
 (defn weapon
   [weapon-type trow]
@@ -24,6 +39,29 @@
                                         (hickory.select/tag :div)) trow)
             first
             (text-content))
+        
+        img
+        (-> (hickory.select/select
+             (hickory.select/descendant (hickory.select/and (hickory.select/tag :td)
+                                                            (hickory.select/nth-child 1))
+                                        (hickory.select/tag :img)) trow)
+            first
+            (get-in [:attrs :src]))
+
+        decos
+        (->> trow 
+         (hickory.select/select
+             (hickory.select/descendant (hickory.select/and (hickory.select/tag :td)
+                                                            (hickory.select/nth-child 2))
+                                        (hickory.select/tag :img)))
+         (seq)
+         (map (fn [el]
+                (-> (get-in el [:attrs :src]) 
+                    (string/split #"/")
+                    last
+                    (string/split #"\.")
+                    first
+                    ))))
 
         rampage-skills
         (->> trow
@@ -43,10 +81,41 @@
             :content
             string/join
             string/trim)
+
+        element
+        (-> (hickory.select/select
+             (hickory.select/descendant (hickory.select/and (hickory.select/tag :td)
+                                                            (hickory.select/nth-child 5))
+                                        (hickory.select/tag :span)) trow)
+            ;;some weapons have 2 elements re-visit later
+            first
+            :content
+            (get-element))
+        
+        affinity
+        (-> (hickory.select/select
+             (hickory.select/descendant (hickory.select/and (hickory.select/tag :td)
+                                                            (hickory.select/nth-child 5))
+                                        (hickory.select/tag :span)) trow)
+            last
+            :content
+            first
+            (string/join)
+            (string/trim))
+        
+        sharpness
+        (if (not= weapon-type (or "Bow" "Light Bowgun" "Heavy Bowgun"))
+          "This has sharpness!!!")
+        
         ]
     {:name name
+     :img img
+     :decos decos
      :raw-dmg raw-dmg
-     :rampage-skills rampage-skills}))
+     :rampage-skills rampage-skills
+     :element element
+     :affinity affinity
+     :sharpness sharpness}))
 
 
 (defn weapons
