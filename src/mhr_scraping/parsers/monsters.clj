@@ -44,8 +44,8 @@
 
 (defn monster
   [url]
-  
-  (->> (:body (client/get "https://mhrise.kiranico.com/data/monsters/366824395"))
+  (->> #_(:body (client/get "https://mhrise.kiranico.com/data/monsters/366824395"))
+       (:body (client/get url))
        hickory/parse
        hickory/as-hickory
        (hickory.select/select

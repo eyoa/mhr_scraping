@@ -94,8 +94,9 @@
         
         affinity
         (-> (hickory.select/select
-             (hickory.select/descendant (hickory.select/and (hickory.select/tag :td)
+             (hickory.select/child (hickory.select/and (hickory.select/tag :td)
                                                             (hickory.select/nth-child 5))
+                                        (hickory.select/tag :div)
                                         (hickory.select/tag :span)) trow)
             last
             :content
@@ -104,8 +105,10 @@
             (string/trim))
         
         sharpness
-        (if (not= weapon-type (or "Bow" "Light Bowgun" "Heavy Bowgun"))
-          "This has sharpness!!!")
+        (if (not=  (some #{weapon-type} '("Bow" "Light Bowgun" "Heavy Bowgun")) nil)
+          
+          (str "This has sharpness!!!!!")
+          (str "ranged weapon"))
         
         ]
     {:name name
@@ -120,7 +123,8 @@
 
 (defn weapons
   [body]
-  (->> (:body (client/get "https://mhrise.kiranico.com/data/weapons?scope=wp&value=0"))
+  (->> (:body (client/get "https://mhrise.kiranico.com/data/weapons?scope=wp&value=11"))
+       #_body
        hickory/parse
        hickory/as-hickory
        (hickory.select/select
