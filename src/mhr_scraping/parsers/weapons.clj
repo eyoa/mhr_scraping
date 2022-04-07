@@ -14,21 +14,61 @@
       string/join
       string/trim))
 
+(defn get-px-amt
+  [value]
+  (Integer. (re-find #"\d+" value )))
+
+
 (defn get-element
   [element]
   (if (empty? element)
     nil
-    (map (fn [el]
-           (if (= (:type el) :element)
-             (-> el
-                 :content
-                 first
-                 (get-in [:attrs :src])
-                 (string/split #"/")
-                 last
-                 (string/split #"\.")
-                 first)
-             (string/trim el))) element )))
+    (->> element
+         (map (fn [{multi-el :content}]
+                (map (fn [el]
+                       (if (= (:type el) :element)
+                         (-> el
+                             :content
+                             first
+                             (get-in [:attrs :src])
+                             (string/split #"/")
+                             last
+                             (string/split #"\.")
+                             first)
+                         (string/trim el))) multi-el ))))))
+
+
+(defn get-sharpness
+  [elements]
+  (let [base
+        (->> elements
+            first
+            :content
+            (map (fn [entry]
+                   (-> (get-in entry [:attrs :style])
+                       (string/split #";|:")
+                       second
+                       (get-px-amt)
+                       float
+                       (* 100 (/ 88))))))
+        
+        bonus
+        (->> elements
+            second
+            :content
+            (map (fn [entry]
+                   (-> (get-in entry [:attrs :style])
+                       (string/split #";|:")
+                       second
+                       (get-px-amt)
+                       float
+                       (* 100 (/ 88))))))]
+    {:base base
+     :bonus bonus}))
+
+
+
+
 
 (defn weapon
   [weapon-type tbody]
@@ -89,12 +129,9 @@
 
                 element
                 (-> (hickory.select/select
-                     (hickory.select/descendant (hickory.select/and (hickory.select/tag :td)
+                     (hickory.select/child (hickory.select/and (hickory.select/tag :td)
                                                                     (hickory.select/nth-child 5))
                                                 (hickory.select/tag :span)) trow)
-                    ;;some weapons have 2 elements re-visit later
-                    first
-                    :content
                     (get-element))
                 
                 affinity
@@ -108,10 +145,24 @@
                     first
                     (string/join)
                     (string/trim))
+               
                 
+                def-bonus
+                (-> (hickory.select/select
+                     (hickory.select/child (hickory.select/and (hickory.select/tag :td)
+                                                               (hickory.select/nth-child 5))
+                                           (hickory.select/and (hickory.select/tag :div)
+                                                               (hickory.select/find-in-text #"Defense"))) trow)
+                    first
+                    :content
+                    (some->
+                     first
+                     (string/split #" ")
+                     last))
+
                 sharpness
                 (if (some #{weapon-type} '("Bow" "Light Bowgun" "Heavy Bowgun"))
-                  (str "ranged weapon")  
+                  nil  
                   (->> trow 
                        (hickory.select/select
                          (hickory.select/child (hickory.select/and (hickory.select/tag :td)
@@ -119,13 +170,103 @@
                                                (hickory.select/tag :div)))
                       first
                       :content
-                      first
-                      :content
-                      (map (fn [entry]
-                             (get-in entry [:attrs :style])))
-                      
-                                         ))
+                      (get-sharpness)))
+
+                horn-notes
+                (if (= weapon-type "Hunting Horn")
+                  (->> trow
+                     (hickory.select/select
+                      (hickory.select/descendant (hickory.select/and (hickory.select/tag :td)
+                                                                     (hickory.select/nth-child 7))
+                                                 (hickory.select/tag :div)))
+                     (map (fn [el]
+                            (-> el
+                                :content
+                                first
+                                (string/trim))))))
+
+                shelling-type
+                (if (= weapon-type "Gunlance")
+                  (->> trow
+                     (hickory.select/select
+                      (hickory.select/descendant (hickory.select/and (hickory.select/tag :td)
+                                                                     (hickory.select/nth-child 7))
+                                                 (hickory.select/tag :div)))
+                     (map (fn [el]
+                            (-> el
+                                :content
+                                first
+                                (string/trim))))))
+
+                phial-type
+                ;;some of these have values?? check if they can be left out
+                (if (some #{weapon-type} '("Switch Axe" "Charge Blade"))
+                  (->> trow
+                     (hickory.select/select
+                      (hickory.select/descendant (hickory.select/and (hickory.select/tag :td)
+                                                                     (hickory.select/nth-child 7))
+                                                 (hickory.select/tag :div)))
+                     (map (fn [el]
+                            (-> el
+                                :content
+                                first
+                                (string/trim))))))
+
+                kinsect-lv
+                (if (= weapon-type "Insect Glaive")
+                  (->> trow
+                     (hickory.select/select
+                      (hickory.select/descendant (hickory.select/and (hickory.select/tag :td)
+                                                                     (hickory.select/nth-child 7))
+                                                 (hickory.select/tag :div)))
+                     (map (fn [el]
+                            (-> el
+                                :content
+                                first
+                                (string/trim))))))
                 
+                charge-lv-atk
+                ;; last item is greyed out... is green or grey class required info?
+                (if (= weapon-type "Bow")
+                  (->> trow
+                     (hickory.select/select
+                      (hickory.select/descendant (hickory.select/and (hickory.select/tag :td)
+                                                                     (hickory.select/nth-child 6))
+                                                 (hickory.select/tag :div)))
+                     (map (fn [el]
+                            (-> el
+                                :content
+                                first)))))
+
+                coatings
+                ;; check for grey in class?? is green or grey class required info?
+                (if (= weapon-type "Bow")
+                  (->> trow
+                     (hickory.select/select
+                      (hickory.select/descendant (hickory.select/and (hickory.select/tag :td)
+                                                                     (hickory.select/nth-child 7))
+                                                 (hickory.select/tag :div)))
+                     (map (fn [el]
+                            (-> el
+                                :content
+                                first
+                                (string/trim))))))
+
+                #_drr
+                #_(if (some #{weapon-type} '("Heavy Bowgun" "Light Bowgun"))
+                  (->> trow
+                     (hickory.select/select
+                      (hickory.select/descendant (hickory.select/and (hickory.select/tag :td)
+                                                                     (hickory.select/nth-child 6))
+                                                 (hickory.select/tag :div)))
+                     (map (fn [el]
+                            (-> el
+                                :content
+                                first
+                                (string/trim)
+                                (string/split #" " 2)
+                                )))))
+
                 ]
             {:name name
              :img img
@@ -134,12 +275,20 @@
              :rampage-skills rampage-skills
              :element element
              :affinity affinity
-             :sharpness sharpness})))))
+             :def-bonus def-bonus
+             :sharpness sharpness
+             :horn-notes horn-notes
+             :shelling-type shelling-type
+             :phial-type phial-type
+             :kinsect-lv  kinsect-lv
+             :charge-lv-atk charge-lv-atk
+             :coatings coatings
+             #_:drr #_drr})))))
 
 
 (defn weapons
   [body]
-  (->> (:body (client/get "https://mhrise.kiranico.com/data/weapons?scope=wp&value=0"))
+  (->> (:body (client/get "https://mhrise.kiranico.com/data/weapons?scope=wp&value=10"))
        #_body
        hickory/parse
        hickory/as-hickory
@@ -161,4 +310,3 @@
                  
                    {:weapon/weapon-type weapon-type
                     :weapon/weapon-list weapon-list})))))
-
