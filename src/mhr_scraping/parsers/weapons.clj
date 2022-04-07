@@ -76,7 +76,31 @@
        (hickory.select/select
         (hickory.select/descendant (hickory.select/tag :table)))
        second)
-   :td)
+  )
+
+
+
+
+
+
+(defn weapon
+  [weapon-type tbody]
+  (->> tbody 
+       first
+   (hickory.select/select
+    (hickory.select/descendant (hickory.select/tag :tr)))
+   (map (fn [trow]
+          (let [name
+                (-> (hickory.select/select
+                     (hickory.select/descendant (hickory.select/and (hickory.select/tag :td)
+                                                                    (hickory.select/nth-child 2))
+                                                (hickory.select/tag :div)) trow)
+                    first
+                    (text-content))
+                
+                details
+                (-> (hickory.select/select
+                     (hickory.select/descendant (hickory.select/and (hickory.select/tag :td)
                                                                     (hickory.select/nth-child 2))
                                                 (hickory.select/tag :div)
                                                 (hickory.select/tag :a)) trow)
