@@ -67,24 +67,23 @@
      :bonus bonus}))
 
 
-
-
-
-(defn weapon
-  [weapon-type tbody]
-  (->> tbody 
-       first
-   (hickory.select/select
-    (hickory.select/descendant (hickory.select/tag :tr)))
-   (map (fn [trow]
-          (let [name
-                (-> (hickory.select/select
-                     (hickory.select/descendant (hickory.select/and (hickory.select/tag :td)
+(defn get-details
+  [url]
+  (->> #_(:body (client/get url))
+       (:body (client/get "https://mhrise.kiranico.com/data/weapons/1094177510"))
+       hickory/parse
+       hickory/as-hickory
+       (hickory.select/select
+        (hickory.select/descendant (hickory.select/tag :table)))
+       second)
+   :td)
                                                                     (hickory.select/nth-child 2))
-                                                (hickory.select/tag :div)) trow)
+                                                (hickory.select/tag :div)
+                                                (hickory.select/tag :a)) trow)
                     first
-                    (text-content))
-                
+                    (get-in [:attrs :href])
+                    (get-details))
+
                 img
                 (-> (hickory.select/select
                      (hickory.select/descendant (hickory.select/and (hickory.select/tag :td)
@@ -269,6 +268,8 @@
 
                 ]
             {:name name
+             :details details}
+            #_{:name name
              :img img
              :decos decos
              :raw-dmg raw-dmg
@@ -283,12 +284,13 @@
              :kinsect-lv  kinsect-lv
              :charge-lv-atk charge-lv-atk
              :coatings coatings
-             #_:drr #_drr})))))
+             #_:drr #_drr
+             :details details})))))
 
 
 (defn weapons
   [body]
-  (->> (:body (client/get "https://mhrise.kiranico.com/data/weapons?scope=wp&value=10"))
+  (->> (:body (client/get "https://mhrise.kiranico.com/data/weapons?scope=wp&value=3"))
        #_body
        hickory/parse
        hickory/as-hickory
