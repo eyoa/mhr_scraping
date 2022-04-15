@@ -1,12 +1,11 @@
 (ns mhr-scraping.core
   (:require
    [clojure.string :as string]
-   [clj-http.client :as client]
-   [hickory.select :as hickory.select]
-   [hickory.core :as hickory]
+   [hickory.core :as h]
+   [hickory.select :as hs]
+   [mhr-scraping.http :as http]
    [mhr-scraping.parsers.monsters :as parsers.monsters]
    [mhr-scraping.parsers.weapons :as parsers.weapons]))
-
 
 (defmulti parse
   (fn [nav]
@@ -18,12 +17,12 @@
   nil)
 
 #_(defmethod parse "Monsters"
-  [nav]
-  (parsers.monsters/monsters (:body (client/get (:nav/href nav)))))
+    [nav]
+    (parsers.monsters/monsters (:body (http/get (:nav/href nav)))))
 
 (defmethod parse "Weapons"
   [nav]
-  (parsers.weapons/weapons (:body (client/get (:nav/href nav)))))
+  (parsers.weapons/weapons (:body (http/get (:nav/href nav)))))
 
 (def domain
   "https://mhrise.kiranico.com/")
@@ -40,21 +39,19 @@
                          string/join
                          string/trim)
           :nav/href (get-in el [:attrs :href])})
-       (hickory.select/select (hickory.select/child (hickory.select/tag :a))
-                              subnav)))
+       (hs/select (hs/child (hs/tag :a))
+                  subnav)))
 
 (defn nav
   []
-  (->> (client/get domain)
+  (->> (http/get domain)
        :body
        hickory/parse
        hickory/as-hickory
-       (hickory.select/select
-        (hickory.select/child
-         (hickory.select/and (hickory.select/tag :nav)
-                             (hickory.select/attr :aria-label
-                                                  (fn [s]
-                                                    (= s "Sidebar"))))))
+       (hs/select (hs/child (hs/and (hs/tag :nav)
+                                    (hs/attr :aria-label
+                                             (fn [s]
+                                               (= s "Sidebar"))))))
        first
        :content
        first
@@ -79,4 +76,7 @@
 
 (defn -main
   []
-  (mapcat parse (nav)))
+  (->> (nav)
+       (pmap parse)
+       doall
+       (apply concat)))
