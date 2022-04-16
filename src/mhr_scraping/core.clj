@@ -46,8 +46,8 @@
   []
   (->> (http/get domain)
        :body
-       hickory/parse
-       hickory/as-hickory
+       h/parse
+       h/as-hickory
        (hs/select (hs/child (hs/and (hs/tag :nav)
                                     (hs/attr :aria-label
                                              (fn [s]
